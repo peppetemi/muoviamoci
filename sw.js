@@ -1,6 +1,6 @@
 // Network-first service worker: always fresh when online, works offline from cache.
 // Bump VERSION when you change the list of files below.
-const VERSION = 'muoviamoci-v6';
+const VERSION = 'muoviamoci-v7';
 const ASSETS = [
   './',
   './index.html',

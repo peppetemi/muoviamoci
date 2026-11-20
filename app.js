@@ -121,8 +121,6 @@ function amountLong(act, n) {
   if (act === 'swim') return `${n} vasche · ${fmtDist(n * pool())}`;
   return fmtMin(n);
 }
-// Short form for pills: "40", "15′"
-const amountShort = (act, n) => (act === 'swim' ? `${n}` : `${n}′`);
 // Totals: "210 vasche", "2 h 30 min"
 const amountTotal = (act, n) => (act === 'swim' ? `${n} vasche` : fmtMin(n));
 
@@ -308,21 +306,6 @@ function viewToday() {
     </button>`;
   }).join('');
 
-  const isPast = sel < state.today;
-  const rows = PEOPLE.map((p) => {
-    const list = ORDER.map((a) => findEntry(sel, p, a)).filter(Boolean);
-    const pills = list.map((e) => {
-      const n = amountOf(e);
-      return `<span class="pill ${e.activity}">${ACTS[e.activity].emoji}${n ? ` ${amountShort(e.activity, n)}` : ''}</span>`;
-    }).join('');
-    return `<div class="row">
-      <span class="avatar ${p}">${initial(p)}</span>
-      <span class="who">${esc(name(p))}</span>
-      ${list.length ? `<span class="pills">${pills}</span>` : `<span class="none">${isPast ? 'Riposo 😴' : 'Ancora niente… 👀'}</span>`}
-    </div>`;
-  }).join('');
-  const both = PEOPLE.every((p) => actsOn(sel, p).length);
-
   return `
     ${header(greeting(), `Ciao, ${esc(name(me))}`)}
     ${streakBanner()}
@@ -336,12 +319,7 @@ function viewToday() {
         <span class="avatar ${p}">${initial(p)}</span>${esc(name(p))}
       </button>`).join('')}
     </div>
-    <section class="acts">${actsHtml}</section>
-    <section class="card together">
-      <h3>La giornata</h3>
-      ${rows}
-      ${both ? '<div class="both">💞 Entrambi in movimento!</div>' : ''}
-    </section>`;
+    <section class="acts">${actsHtml}</section>`;
 }
 
 // Slim tile: label, shared number, then each person's number inline.
@@ -384,20 +362,22 @@ function weekCard() {
     return `<button class="wk-row ${k === state.today ? 'today' : ''}" data-action="cal-day" data-date="${k}" aria-label="${longDate(k)}">${label}<div class="wk-lines">${lines}</div></button>`;
   }).join('');
 
-  // Week totals for both of you together.
+  // Week totals: one line per person, then both of you together.
   const inWeek = state.entries.filter((e) => e.date >= monday && e.date <= days[6]);
-  const totals = ORDER.map((a) => {
-    const list = inWeek.filter((e) => e.activity === a);
-    if (!list.length) return '';
-    if (a === 'volley') return `<span class="pill volley">🏐 ${list.length}</span>`;
-    const tot = list.reduce((t, e) => t + (amountOf(e) || 0), 0);
-    return `<span class="pill ${a}">${ACTS[a].emoji}${tot ? ` ${amountTotal(a, tot)}` : ` ${list.length}×`}</span>`;
-  }).join('');
+  const totalChips = (list) => ORDER.map((a) => {
+    const of = list.filter((e) => e.activity === a);
+    if (!of.length) return '';
+    if (a === 'volley') return `<span class="pill volley">🏐 ${of.length}</span>`;
+    const tot = of.reduce((t, e) => t + (amountOf(e) || 0), 0);
+    return `<span class="pill ${a}">${ACTS[a].emoji}${tot ? ` ${amountTotal(a, tot)}` : ` ${of.length}×`}</span>`;
+  }).join('') || '<span class="none">—</span>';
+  const totalLines = PEOPLE.map((p) => `<div class="wk-line"><i class="avatar xs ${p}">${initial(p)}</i>${totalChips(inWeek.filter((e) => e.person === p))}</div>`).join('')
+    + `<div class="wk-line wk-both"><i class="avatar xs both" aria-label="Insieme">💞</i>${totalChips(inWeek)}</div>`;
 
   return `<section class="card week-card">
     <div class="section-title"><h3>Questa settimana</h3><small>${range}</small></div>
     <div class="wk-rows">${rows}</div>
-    <div class="wk-total"><span>Totale settimana</span><span class="pills">${totals || '<span class="none">Ancora niente</span>'}</span></div>
+    <div class="wk-row wk-total"><span class="wk-day"><b>Totale</b></span><div class="wk-lines">${totalLines}</div></div>
   </section>`;
 }
 
