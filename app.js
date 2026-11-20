@@ -344,19 +344,65 @@ function viewToday() {
     </section>`;
 }
 
-// Sum of logged amounts (vasche or minuti) for one person over some activities, all time.
-const sumBy = (p, acts) => state.entries.filter((e) => e.person === p && acts.includes(e.activity)).reduce((t, e) => t + (amountOf(e) || 0), 0);
-
-function statTile(emoji, total, label, perPerson) {
-  return `<div class="card stat">
-    <span class="emo">${emoji}</span><strong>${total}</strong><span>${label}</span>
-    <div class="split">${PEOPLE.map((p, i) => `<span><i class="avatar xs ${p}">${initial(p)}</i>${perPerson[i]}</span>`).join('')}</div>
+// Slim tile: label, shared number, then each person's number inline.
+function miniStat(emoji, label, total, perPerson) {
+  return `<div class="card mini-stat">
+    <span class="ms-label">${emoji} ${label}</span>
+    <div class="ms-row"><strong>${total}</strong>
+      <span class="ms-split">${PEOPLE.map((p, i) => `<span><i class="avatar xs ${p}">${initial(p)}</i>${perPerson[i]}</span>`).join('')}</span>
+    </div>
   </div>`;
+}
+
+// Chip for one entry in the week card: "🏊 30 vasche", "🧘 15 min", "🏐 volley".
+function weekChip(e) {
+  const n = amountOf(e);
+  const txt = e.activity === 'volley' ? 'volley' : n ? amountTotal(e.activity, n) : '';
+  return `<span class="pill ${e.activity}">${ACTS[e.activity].emoji}${txt ? ` ${txt}` : ''}</span>`;
+}
+
+// Monday to Sunday of the current week, one row per day, each person on their own line.
+function weekCard() {
+  const d0 = parse(state.today);
+  const monday = addDays(state.today, -((d0.getDay() + 6) % 7));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const sun = parse(days[6]), mon = parse(monday);
+  const range = mon.getMonth() === sun.getMonth()
+    ? `${mon.getDate()}–${sun.getDate()} ${MONTHS[sun.getMonth()].slice(0, 3)}`
+    : `${mon.getDate()} ${MONTHS[mon.getMonth()].slice(0, 3)} – ${sun.getDate()} ${MONTHS[sun.getMonth()].slice(0, 3)}`;
+
+  const rows = days.map((k) => {
+    const d = parse(k);
+    const future = k > state.today;
+    const label = `<span class="wk-day"><b>${WD_SHORT[d.getDay()]}</b><small>${k === state.today ? 'oggi' : d.getDate()}</small></span>`;
+    if (future) return `<div class="wk-row future">${label}<div class="wk-lines"><span class="none">—</span></div></div>`;
+    const lines = PEOPLE.map((p) => {
+      const list = ORDER.map((a) => findEntry(k, p, a)).filter(Boolean);
+      const empty = k === state.today ? 'ancora niente' : '—';
+      return `<div class="wk-line"><i class="avatar xs ${p}">${initial(p)}</i>${list.length ? list.map(weekChip).join('') : `<span class="none">${empty}</span>`}</div>`;
+    }).join('');
+    return `<button class="wk-row ${k === state.today ? 'today' : ''}" data-action="cal-day" data-date="${k}" aria-label="${longDate(k)}">${label}<div class="wk-lines">${lines}</div></button>`;
+  }).join('');
+
+  // Week totals for both of you together.
+  const inWeek = state.entries.filter((e) => e.date >= monday && e.date <= days[6]);
+  const totals = ORDER.map((a) => {
+    const list = inWeek.filter((e) => e.activity === a);
+    if (!list.length) return '';
+    if (a === 'volley') return `<span class="pill volley">🏐 ${list.length}</span>`;
+    const tot = list.reduce((t, e) => t + (amountOf(e) || 0), 0);
+    return `<span class="pill ${a}">${ACTS[a].emoji}${tot ? ` ${amountTotal(a, tot)}` : ` ${list.length}×`}</span>`;
+  }).join('');
+
+  return `<section class="card week-card">
+    <div class="section-title"><h3>Questa settimana</h3><small>${range}</small></div>
+    <div class="wk-rows">${rows}</div>
+    <div class="wk-total"><span>Totale settimana</span><span class="pills">${totals || '<span class="none">Ancora niente</span>'}</span></div>
+  </section>`;
 }
 
 function viewProgress() {
   const st = streaks();
-  const s = summary();
   const month = state.calMonth;
   const [y, m] = month.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
@@ -399,11 +445,10 @@ function viewProgress() {
   return `
     ${header('Insieme', 'Progressi')}
     <section class="stats">
-      ${statTile('🔥', st.cur, 'serie insieme', PEOPLE.map((p) => streaks(p).cur))}
-      ${statTile('🏆', st.best, 'record insieme', PEOPLE.map((p) => streaks(p).best))}
-      ${statTile('🌊', s.vasche, `vasche · ${fmtDist(s.vasche * pool())}`, PEOPLE.map((p) => sumBy(p, ['swim'])))}
-      ${statTile('⏱️', fmtMin(s.stretchMin + s.walkMin), 'stretching e camminata', PEOPLE.map((p) => fmtMin(sumBy(p, ['stretch', 'walk']))))}
+      ${miniStat('🔥', 'Serie insieme', st.cur, PEOPLE.map((p) => streaks(p).cur))}
+      ${miniStat('🏆', 'Record insieme', st.best, PEOPLE.map((p) => streaks(p).best))}
     </section>
+    ${weekCard()}
     <section class="card">
       <div class="cal-head">
         <button data-action="cal-prev" aria-label="Mese precedente">‹</button>
