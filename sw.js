@@ -1,6 +1,9 @@
 // Network-first service worker: always fresh when online, works offline from cache.
-// Bump VERSION when you change the list of files below.
-const VERSION = 'muoviamoci-v7';
+// GitHub Pages lets browsers reuse files for 10 minutes; every request here skips
+// that (cache: 'no-cache' revalidates with the server, a cheap 304 when nothing
+// changed), so a new version shows up on the next open instead of up to 10 min later.
+// Bump VERSION on every release so phones install the new worker and reload.
+const VERSION = 'muoviamoci-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -16,7 +19,11 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSION)
+      .then((c) => c.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -31,7 +38,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();

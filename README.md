@@ -35,4 +35,4 @@ Then open http://localhost:5173.
 
 ## Updating the app
 
-Bump `VERSION` in `sw.js` whenever you add or rename files, so phones pick up the new file list.
+Commit and push to `main`; GitHub Pages republishes in about a minute. Bump `VERSION` in `sw.js` on every release: open apps notice the new version when they're brought to the front, install it and reload by themselves.

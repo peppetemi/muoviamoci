@@ -1056,7 +1056,23 @@ async function init() {
   addEventListener('online', () => runSync());
   setInterval(() => { if (!document.hidden) runSync(); }, 30000);
 
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    // When a new version takes over, reload once so the whole app is the new version.
+    // (Skip on the very first install, when there was no previous version.)
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded || document.querySelector('.sheet-wrap')) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then((reg) => {
+        // Home-screen apps are often resumed, not restarted: check for updates on every resume too.
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      })
+      .catch(() => {});
+  }
 }
 
 init();
