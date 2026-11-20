@@ -152,12 +152,23 @@ function render() {
     if (!$app.querySelector('.onboard')) renderOnboarding(state.joinCode ? 'join' : 'start');
     return;
   }
-  $app.innerHTML = `
-    <main class="screen">${state.tab === 'oggi' ? viewToday() : viewProgress()}</main>
-    <nav class="nav"><div class="nav-inner">
-      <button class="${state.tab === 'oggi' ? 'on' : ''}" data-action="tab" data-tab="oggi">${ICON.today}Oggi</button>
-      <button class="${state.tab === 'progressi' ? 'on' : ''}" data-action="tab" data-tab="progressi">${ICON.chart}Progressi</button>
-    </div></nav>`;
+  // The shell (scroll area + bottom bar) is built once; later renders only swap
+  // the content, so the bar never moves and the scroll position is kept.
+  let screen = document.getElementById('screen');
+  if (!screen) {
+    $app.innerHTML = `
+      <main class="screen" id="screen"></main>
+      <nav class="nav"><div class="nav-inner">
+        <button data-action="tab" data-tab="oggi">${ICON.today}Oggi</button>
+        <button data-action="tab" data-tab="progressi">${ICON.chart}Progressi</button>
+      </div></nav>`;
+    screen = document.getElementById('screen');
+  }
+  const enter = screen.dataset.tab !== state.tab;
+  screen.dataset.tab = state.tab;
+  screen.innerHTML = `<div class="view${enter ? ' enter' : ''}">${state.tab === 'oggi' ? viewToday() : viewProgress()}</div>`;
+  if (enter) screen.scrollTop = 0;
+  $app.querySelectorAll('.nav [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
 }
 
 function greeting() {
@@ -534,7 +545,6 @@ document.addEventListener('click', (ev) => {
     case 'tab':
       state.tab = el.dataset.tab;
       render();
-      scrollTo(0, 0);
       break;
     case 'day': state.date = el.dataset.date; render(); break;
     case 'today': state.date = state.today; render(); break;
@@ -547,7 +557,6 @@ document.addEventListener('click', (ev) => {
       state.date = el.dataset.date;
       state.tab = 'oggi';
       render();
-      scrollTo(0, 0);
       break;
   }
 });
