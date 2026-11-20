@@ -32,11 +32,11 @@ const BADGES = [
   B('team30',    'insieme', '💑', 'Coppia d’acciaio',   '30 giorni attivi insieme',        'togetherDays', 30),
   B('tris',      'insieme', '🎯', 'Tris',               '3 attività diverse in un giorno', 'trisDays',     1),
   B('poker',     'insieme', '🃏', 'Poker',              'Tutte e 4 in un giorno',          'pokerDays',    1),
-  B('streak3',   'serie',   '🔥', 'Tre di fila',        '3 giorni consecutivi',            'best',         3),
-  B('streak7',   'serie',   '⚡', 'Settimana piena',    '7 giorni consecutivi',            'best',         7),
-  B('streak14',  'serie',   '🌟', 'Due settimane',      '14 giorni consecutivi',           'best',         14),
-  B('streak30',  'serie',   '👑', 'Inarrestabili',      '30 giorni consecutivi',           'best',         30),
-  B('streak100', 'serie',   '💎', 'Leggendari',         '100 giorni consecutivi',          'best',         100),
+  B('streak3',   'serie',   '🔥', 'Tre di fila',        '3 giorni di fila insieme',            'best',         3),
+  B('streak7',   'serie',   '⚡', 'Settimana piena',    '7 giorni di fila insieme',            'best',         7),
+  B('streak14',  'serie',   '🌟', 'Due settimane',      '14 giorni di fila insieme',           'best',         14),
+  B('streak30',  'serie',   '👑', 'Inarrestabili',      '30 giorni di fila insieme',           'best',         30),
+  B('streak100', 'serie',   '💎', 'Leggendari',         '100 giorni di fila insieme',          'best',         100),
   B('v100',      'swim',    '🐟', 'Pesciolino',         '100 vasche',                      'vasche',       100),
   B('v500',      'swim',    '🐬', 'Delfino',            '500 vasche',                      'vasche',       500),
   B('v1000',     'swim',    '🦈', 'Squalo',             '1.000 vasche',                    'vasche',       1000),
@@ -126,6 +126,14 @@ const amountShort = (act, n) => (act === 'swim' ? `${n}` : `${n}′`);
 // Totals: "210 vasche", "2 h 30 min"
 const amountTotal = (act, n) => (act === 'swim' ? `${n} vasche` : fmtMin(n));
 
+// Two rows of activity dots: first person on top, second below (faint dot = nothing that day).
+function dayDots(date) {
+  return `<span class="dots2">${PEOPLE.map((p) => {
+    const acts = actsOn(date, p);
+    return `<span class="dots">${acts.length ? acts.map((a) => `<i class="dot ${a}"></i>`).join('') : '<i class="dot"></i>'}</span>`;
+  }).join('')}</span>`;
+}
+
 const entryId = (date, person, act) => `${date}_${person}_${act}`;
 const findEntry = (date, person, act) => state.entries.find((e) => e.id === entryId(date, person, act));
 const entriesOn = (date) => state.entries.filter((e) => e.date === date);
@@ -136,8 +144,16 @@ function lastAmount(person, act) {
   return list[0] ? amountOf(list[0]) : null;
 }
 
+// streaks('a') / streaks('b'): days that person moved. streaks(): shared, days you BOTH moved.
+function activeDays(person) {
+  const by = (p) => new Set(state.entries.filter((e) => e.person === p).map((e) => e.date));
+  if (person) return by(person);
+  const [a, b] = PEOPLE.map(by);
+  return new Set([...a].filter((d) => b.has(d)));
+}
+
 function streaks(person) {
-  const days = new Set(state.entries.filter((e) => !person || e.person === person).map((e) => e.date));
+  const days = activeDays(person);
   let cur = 0;
   let k = state.today;
   if (!days.has(k)) k = addDays(k, -1); // today is still open: yesterday keeps the streak alive
@@ -245,21 +261,25 @@ function header(eyebrow, title) {
 
 function streakBanner() {
   const st = streaks();
+  const missing = PEOPLE.filter((p) => !actsOn(state.today, p).length);
+  const nudge = missing.length === 2 ? 'entrambi' : missing.length ? esc(name(missing[0])) : '';
+  const giorni = (n) => `${n} ${n === 1 ? 'giorno' : 'giorni'}`;
   let title, sub, cold = false;
   if (st.cur === 0) {
-    title = 'Nuova serie';
-    sub = 'Registrate un’attività per accendere la fiamma';
+    title = 'Nuova serie insieme';
+    sub = missing.length === 2 ? 'Muovetevi entrambi oggi per accendere la fiamma' : `Manca ${nudge} per accendere la fiamma`;
     cold = true;
   } else if (!st.today) {
-    title = `${st.cur} ${st.cur === 1 ? 'giorno' : 'giorni'} di fila`;
-    sub = 'Muovetevi oggi per non spezzare la serie!';
+    title = `${giorni(st.cur)} di fila insieme`;
+    sub = missing.length === 2 ? 'Muovetevi entrambi oggi per non spezzare la serie!' : `Manca ${nudge} per tenere viva la serie!`;
   } else {
-    title = `${st.cur} ${st.cur === 1 ? 'giorno' : 'giorni'} di fila`;
-    sub = st.cur >= st.best && st.cur > 1 ? 'Nuovo record di coppia! 🏆' : `Record: ${st.best} ${st.best === 1 ? 'giorno' : 'giorni'}`;
+    title = `${giorni(st.cur)} di fila insieme`;
+    sub = st.cur >= st.best && st.cur > 1 ? 'Nuovo record di coppia! 🏆' : `Record: ${giorni(st.best)}`;
   }
+  const mine = PEOPLE.map((p) => `<span><i class="avatar xs ${p}">${initial(p)}</i>🔥 ${streaks(p).cur}</span>`).join('');
   return `<section class="card streak ${cold ? 'cold' : ''}">
     <div class="flame">🔥</div>
-    <div><strong>${title}</strong><p>${sub}</p></div>
+    <div class="streak-txt"><strong>${title}</strong><p>${sub}</p><div class="split">${mine}</div></div>
   </section>`;
 }
 
@@ -271,10 +291,8 @@ function viewToday() {
 
   const weekHtml = week.map((k) => {
     const d = parse(k);
-    const acts = actsOn(k);
-    const dots = acts.length ? acts.map((a) => `<i class="dot ${a}"></i>`).join('') : '<i class="dot"></i>';
     return `<button class="day ${k === sel ? 'sel' : ''} ${k === state.today ? 'today' : ''}" data-action="day" data-date="${k}" aria-label="${longDate(k)}">
-      <span class="wd">${WD_SHORT[d.getDay()]}</span><span class="num">${d.getDate()}</span><span class="dots">${dots}</span>
+      <span class="wd">${WD_SHORT[d.getDay()]}</span><span class="num">${d.getDate()}</span>${dayDots(k)}
     </button>`;
   }).join('');
 
@@ -326,6 +344,16 @@ function viewToday() {
     </section>`;
 }
 
+// Sum of logged amounts (vasche or minuti) for one person over some activities, all time.
+const sumBy = (p, acts) => state.entries.filter((e) => e.person === p && acts.includes(e.activity)).reduce((t, e) => t + (amountOf(e) || 0), 0);
+
+function statTile(emoji, total, label, perPerson) {
+  return `<div class="card stat">
+    <span class="emo">${emoji}</span><strong>${total}</strong><span>${label}</span>
+    <div class="split">${PEOPLE.map((p, i) => `<span><i class="avatar xs ${p}">${initial(p)}</i>${perPerson[i]}</span>`).join('')}</div>
+  </div>`;
+}
+
 function viewProgress() {
   const st = streaks();
   const s = summary();
@@ -342,10 +370,10 @@ function viewProgress() {
     const k = `${month}-${String(d).padStart(2, '0')}`;
     const acts = actsOn(k);
     const future = k > state.today;
-    const dots = acts.map((a) => `<i class="dot ${a}"></i>`).join('');
+    const both = PEOPLE.every((p) => actsOn(k, p).length);
     cells += future
       ? `<span class="cal-day future">${d}</span>`
-      : `<button class="cal-day ${acts.length ? 'active' : ''} ${k === state.today ? 'today' : ''}" data-action="cal-day" data-date="${k}" aria-label="${longDate(k)}">${d}<span class="dots">${dots}</span></button>`;
+      : `<button class="cal-day ${acts.length ? 'active' : ''} ${both ? 'both' : ''} ${k === state.today ? 'today' : ''}" data-action="cal-day" data-date="${k}" aria-label="${longDate(k)}">${d}${acts.length ? dayDots(k) : ''}</button>`;
   }
 
   // Stats for the calendar's month, or since the beginning.
@@ -371,10 +399,10 @@ function viewProgress() {
   return `
     ${header('Insieme', 'Progressi')}
     <section class="stats">
-      <div class="card stat"><span class="emo">🔥</span><strong>${st.cur}</strong><span>serie attuale</span></div>
-      <div class="card stat"><span class="emo">🏆</span><strong>${st.best}</strong><span>record di giorni</span></div>
-      <div class="card stat"><span class="emo">🌊</span><strong>${s.vasche}</strong><span>vasche · ${fmtDist(s.vasche * pool())}</span></div>
-      <div class="card stat"><span class="emo">⏱️</span><strong>${fmtMin(s.stretchMin + s.walkMin)}</strong><span>di stretching e camminata</span></div>
+      ${statTile('🔥', st.cur, 'serie insieme', PEOPLE.map((p) => streaks(p).cur))}
+      ${statTile('🏆', st.best, 'record insieme', PEOPLE.map((p) => streaks(p).best))}
+      ${statTile('🌊', s.vasche, `vasche · ${fmtDist(s.vasche * pool())}`, PEOPLE.map((p) => sumBy(p, ['swim'])))}
+      ${statTile('⏱️', fmtMin(s.stretchMin + s.walkMin), 'stretching e camminata', PEOPLE.map((p) => fmtMin(sumBy(p, ['stretch', 'walk']))))}
     </section>
     <section class="card">
       <div class="cal-head">
@@ -384,6 +412,7 @@ function viewProgress() {
       </div>
       <div class="cal">${cells}</div>
       <div class="legend">${ORDER.map((a) => `<span><i class="dot ${a}"></i>${ACTS[a].label}</span>`).join('')}</div>
+      <p class="legend-rows">Riga sopra: ${esc(name('a'))} · riga sotto: ${esc(name('b'))} · <span class="both-key"></span> entrambi</p>
     </section>
     <section class="card">
       <div class="section-title">
