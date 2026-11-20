@@ -362,7 +362,7 @@ function weekCard() {
     return `<button class="wk-row ${k === state.today ? 'today' : ''}" data-action="cal-day" data-date="${k}" aria-label="${longDate(k)}">${label}<div class="wk-lines">${lines}</div></button>`;
   }).join('');
 
-  // Week totals: one line per person, then both of you together.
+  // Week totals: one line per person.
   const inWeek = state.entries.filter((e) => e.date >= monday && e.date <= days[6]);
   const totalChips = (list) => ORDER.map((a) => {
     const of = list.filter((e) => e.activity === a);
@@ -371,8 +371,7 @@ function weekCard() {
     const tot = of.reduce((t, e) => t + (amountOf(e) || 0), 0);
     return `<span class="pill ${a}">${ACTS[a].emoji}${tot ? ` ${amountTotal(a, tot)}` : ` ${of.length}×`}</span>`;
   }).join('') || '<span class="none">—</span>';
-  const totalLines = PEOPLE.map((p) => `<div class="wk-line"><i class="avatar xs ${p}">${initial(p)}</i>${totalChips(inWeek.filter((e) => e.person === p))}</div>`).join('')
-    + `<div class="wk-line wk-both"><i class="avatar xs both" aria-label="Insieme">💞</i>${totalChips(inWeek)}</div>`;
+  const totalLines = PEOPLE.map((p) => `<div class="wk-line"><i class="avatar xs ${p}">${initial(p)}</i>${totalChips(inWeek.filter((e) => e.person === p))}</div>`).join('');
 
   return `<section class="card week-card">
     <div class="section-title"><h3>Questa settimana</h3><small>${range}</small></div>

@@ -656,5 +656,3 @@ h3 { font-size: 17px; font-weight: 700; }
 .wk-lines .none, .wk-total .none { color: var(--muted); font-size: 13px; font-weight: 600; }
 .wk-row.wk-total { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); border-bottom: 0; border-radius: 0; }
 .wk-total .wk-day b { font-size: 13px; }
-.wk-both { padding-top: 4px; margin-top: 2px; border-top: 1px dashed var(--line); }
-.avatar.xs.both { background: var(--flame-soft); font-size: 10px; }
