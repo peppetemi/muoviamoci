@@ -67,6 +67,8 @@ const state = {
   tab: 'oggi',
   calMonth: todayKey().slice(0, 7),
   range: 'month', // Progressi stats: 'month' (calendar month) | 'all'
+  weekMonday: null, // week shown in "Questa settimana" (its Monday); null = current week
+  weekAnim: null,   // 'next' | 'prev': slide direction for the next render
 };
 
 function loadSettings() {
@@ -340,9 +342,25 @@ function weekChip(e) {
 }
 
 // Monday to Sunday of the current week, one row per day, each person on their own line.
+const mondayOf = (key) => addDays(key, -((parse(key).getDay() + 6) % 7));
+
+// Move the week card by n weeks (never past the current week).
+function shiftWeek(n) {
+  const cur = mondayOf(state.today);
+  const next = addDays(state.weekMonday || cur, 7 * n);
+  if (next > cur) return;
+  state.weekMonday = next === cur ? null : next;
+  state.weekAnim = n > 0 ? 'next' : 'prev';
+  render();
+}
+
 function weekCard() {
-  const d0 = parse(state.today);
-  const monday = addDays(state.today, -((d0.getDay() + 6) % 7));
+  const curMonday = mondayOf(state.today);
+  const monday = state.weekMonday || curMonday;
+  const isCurrent = monday === curMonday;
+  const title = isCurrent ? 'Questa settimana' : monday === addDays(curMonday, -7) ? 'Settimana scorsa' : 'Settimana';
+  const anim = state.weekAnim;
+  state.weekAnim = null;
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const sun = parse(days[6]), mon = parse(monday);
   const range = mon.getMonth() === sun.getMonth()
@@ -374,9 +392,16 @@ function weekCard() {
   const totalLines = PEOPLE.map((p) => `<div class="wk-line"><i class="avatar xs ${p}">${initial(p)}</i>${totalChips(inWeek.filter((e) => e.person === p))}</div>`).join('');
 
   return `<section class="card week-card">
-    <div class="section-title"><h3>Questa settimana</h3><small>${range}</small></div>
-    <div class="wk-rows">${rows}</div>
-    <div class="wk-row wk-total"><span class="wk-day"><b>Totale</b></span><div class="wk-lines">${totalLines}</div></div>
+    <div class="wk-head">
+      <button data-action="week-prev" aria-label="Settimana precedente">‹</button>
+      <div class="wk-title"><h3>${title}</h3><small>${range}</small></div>
+      <button data-action="week-next" aria-label="Settimana successiva" ${isCurrent ? 'disabled' : ''}>›</button>
+    </div>
+    ${isCurrent ? '' : '<button class="link wk-back" data-action="week-now">Torna a questa settimana</button>'}
+    <div class="wk-body ${anim ? `slide-${anim}` : ''}">
+      <div class="wk-rows">${rows}</div>
+      <div class="wk-row wk-total"><span class="wk-day"><b>Totale</b></span><div class="wk-lines">${totalLines}</div></div>
+    </div>
   </section>`;
 }
 
@@ -707,6 +732,9 @@ document.addEventListener('click', (ev) => {
     case 'today': state.date = state.today; render(); break;
     case 'person': state.person = el.dataset.person; render(); break;
     case 'range': state.range = el.dataset.range; render(); break;
+    case 'week-prev': shiftWeek(-1); break;
+    case 'week-next': shiftWeek(1); break;
+    case 'week-now': state.weekAnim = 'next'; state.weekMonday = null; render(); break;
     case 'act': onActivity(el.dataset.act); break;
     case 'settings': openSettings(); break;
     case 'cal-prev': state.calMonth = shiftMonth(state.calMonth, -1); render(); break;
@@ -718,6 +746,20 @@ document.addEventListener('click', (ev) => {
       break;
   }
 });
+
+let swipe = null;
+document.addEventListener('touchstart', (e) => {
+  swipe = e.touches.length === 1 && e.target.closest('.week-card')
+    ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+}, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (!swipe) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+  swipe = null;
+  if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+  shiftWeek(dx < 0 ? 1 : -1); // swipe left = newer week, right = older
+}, { passive: true });
 
 function shiftMonth(month, n) {
   const [y, m] = month.split('-').map(Number);

@@ -3,7 +3,7 @@
 // that (cache: 'no-cache' revalidates with the server, a cheap 304 when nothing
 // changed), so a new version shows up on the next open instead of up to 10 min later.
 // Bump VERSION on every release so phones install the new worker and reload.
-const VERSION = 'muoviamoci-v9';
+const VERSION = 'muoviamoci-v10';
 const ASSETS = [
   './',
   './index.html',

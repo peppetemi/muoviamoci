@@ -656,3 +656,23 @@ h3 { font-size: 17px; font-weight: 700; }
 .wk-lines .none, .wk-total .none { color: var(--muted); font-size: 13px; font-weight: 600; }
 .wk-row.wk-total { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); border-bottom: 0; border-radius: 0; }
 .wk-total .wk-day b { font-size: 13px; }
+
+/* ---------- Week card: navigation ---------- */
+
+.wk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.wk-head button {
+  width: 36px; height: 36px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: var(--surface-2);
+  font-size: 18px; font-weight: 700;
+}
+.wk-head button:disabled { opacity: .3; cursor: default; }
+.wk-title { text-align: center; min-width: 0; }
+.wk-title h3 { line-height: 1.2; }
+.wk-title small { color: var(--muted); font-weight: 600; font-size: 13px; }
+.wk-back { display: block; margin: -4px auto 8px; font-size: 13px; }
+.week-card { touch-action: pan-y; }
+.wk-body.slide-next { animation: wk-in-left .28s ease; }
+.wk-body.slide-prev { animation: wk-in-right .28s ease; }
+@keyframes wk-in-left { from { opacity: 0; transform: translateX(28px); } }
+@keyframes wk-in-right { from { opacity: 0; transform: translateX(-28px); } }
