@@ -1,5 +1,6 @@
 -- Muoviamoci: Supabase schema.
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
+-- (Full schema for a fresh project. Existing projects: run the files in migrations/ instead.)
 --
 -- Security model: no logins. Each couple has a "space" whose id is a long random
 -- invite code (e.g. K7QM-3XPA-9FDR). The app sends that code in an `x-space`
@@ -18,8 +19,9 @@ create table if not exists public.entries (
   id          text not null,                         -- "<date>_<person>_<activity>"
   date        date not null,
   person      text not null check (person in ('a', 'b')),
-  activity    text not null check (activity in ('swim', 'volley', 'stretch')),
+  activity    text not null check (activity in ('swim', 'volley', 'stretch', 'walk')),
   vasche      int  check (vasche is null or vasche between 1 and 999),
+  minuti      int  check (minuti is null or minuti between 1 and 600),
   updated_at  timestamptz not null default now(),
   primary key (space, id)
 );

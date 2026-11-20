@@ -12,6 +12,8 @@
   --volley-soft: #FCEFDD;
   --stretch: #4F9A68;
   --stretch-soft: #E3F1E7;
+  --walk: #0E9A92;
+  --walk-soft: #DDF2F0;
 
   --flame: #F0566A;
   --flame-soft: #FDE7E5;
@@ -40,6 +42,8 @@
     --volley-soft: rgba(242, 166, 75, .15);
     --stretch: #78C08F;
     --stretch-soft: rgba(120, 192, 143, .15);
+    --walk: #45C9BF;
+    --walk-soft: rgba(69, 201, 191, .15);
 
     --flame: #FF7A85;
     --flame-soft: rgba(255, 122, 133, .15);
@@ -92,7 +96,7 @@ h1, h2, h3, p { margin: 0; }
 .view {
   max-width: 520px;
   margin: 0 auto;
-  padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 104px);
+  padding: calc(env(safe-area-inset-top) + 20px) 16px calc(max(4px, env(safe-area-inset-bottom) - 14px) + 76px);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -353,7 +357,7 @@ h3 { font-size: 17px; font-weight: 700; }
 .pstat-head small { margin-left: auto; color: var(--muted); font-weight: 600; font-size: 13px; }
 .pstat .pills { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.badges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .badge {
   display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
   padding: 14px 6px;
@@ -366,7 +370,7 @@ h3 { font-size: 17px; font-weight: 700; }
 .badge.locked .b-emo { filter: grayscale(1); opacity: .35; }
 .badge.locked strong { color: var(--muted); }
 
-.section-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .section-title small { color: var(--muted); font-weight: 600; font-size: 13px; }
 
 /* ---------- Bottom nav ---------- */
@@ -377,22 +381,22 @@ h3 { font-size: 17px; font-weight: 700; }
   z-index: 10;
   display: flex;
   justify-content: center;
-  padding: 8px 16px calc(env(safe-area-inset-bottom) + 8px);
+  padding: 4px 12px max(4px, calc(env(safe-area-inset-bottom) - 14px));
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
 }
-.nav-inner { display: flex; gap: 8px; width: 100%; max-width: 360px; }
+.nav-inner { display: flex; gap: 4px; width: 100%; max-width: 420px; }
 .nav button {
   flex: 1;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 0;
-  border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 4px 0 2px;
+  border-radius: 12px;
   color: var(--muted);
-  font-size: 12px; font-weight: 700;
+  font-size: 10.5px; font-weight: 700;
 }
-.nav button svg { width: 24px; height: 24px; }
+.nav button svg { width: 22px; height: 22px; }
 .nav button.on { color: var(--ink); }
 
 /* ---------- Sheets ---------- */
@@ -583,3 +587,41 @@ h3 { font-size: 17px; font-weight: 700; }
 .code.sm { font-size: 16px; padding: 10px 12px; flex: 1; text-align: center; }
 .space-row { display: flex; gap: 8px; align-items: center; }
 .sync-status { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+/* ---------- Per-activity colors (shared by cards, dots, pills, sheets) ---------- */
+
+.swim    { --c: var(--swim);    --soft: var(--swim-soft); }
+.volley  { --c: var(--volley);  --soft: var(--volley-soft); }
+.stretch { --c: var(--stretch); --soft: var(--stretch-soft); }
+.walk    { --c: var(--walk);    --soft: var(--walk-soft); }
+
+.dot.walk { background: var(--walk); }
+.pill.walk { background: var(--walk-soft); color: var(--walk); }
+.sheet-head .emo.walk { background: var(--walk-soft); }
+.counter .round { background: var(--soft); color: var(--c); }
+.meters { color: var(--c); }
+.chips .chip.on { background: var(--c); color: #fff; }
+.btn.primary.swim, .btn.primary.stretch, .btn.primary.walk { background: var(--c); color: #fff; }
+
+/* ---------- Progressi: period toggle ---------- */
+
+.seg.mini { padding: 3px; border-radius: 12px; gap: 2px; flex: none; }
+.seg.mini button { padding: 6px 11px; font-size: 13px; border-radius: 9px; }
+.range-note { font-size: 13px; color: var(--muted); font-weight: 600; margin: -4px 0 14px; }
+
+/* ---------- Traguardi ---------- */
+
+.bar { display: block; width: 100%; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: inherit; background: var(--flame); transition: width .6s ease; }
+.bar.big { height: 10px; border-radius: 5px; }
+.badge .bar { width: 78%; margin-top: 6px; }
+.badge .prog { font-weight: 700; }
+
+.trophy { display: flex; flex-direction: column; gap: 12px; }
+.trophy-top { display: flex; align-items: center; justify-content: space-between; }
+.trophy strong { font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.trophy strong span { font-size: 22px; color: var(--muted); }
+.trophy-top p { color: var(--muted); font-weight: 600; font-size: 14px; margin-top: 4px; }
+.trophy-emo { font-size: 46px; line-height: 1; }
+.trophy .next { font-size: 14px; color: var(--muted); font-weight: 600; }
+.trophy .next b { color: var(--ink); font-weight: 750; }

@@ -2,12 +2,14 @@ import { store, syncEnabled, setSpace, sync, createSpace, fetchSpace, updateSpac
 
 /* ================= Config ================= */
 
+// Activities with an amount open a counter sheet; the others are one tap.
 const ACTS = {
-  swim:    { label: 'Nuoto',        emoji: '🏊' },
+  swim:    { label: 'Nuoto',        emoji: '🏊', field: 'vasche', unit: 'vasche', step: 1, chips: [10, 20, 30, 40, 50, 60], def: 20, max: 999, hint: 'Tocca e conta le vasche' },
   volley:  { label: 'Beach volley', emoji: '🏐' },
-  stretch: { label: 'Stretching',   emoji: '🧘' },
+  stretch: { label: 'Stretching',   emoji: '🧘', field: 'minuti', unit: 'minuti', step: 5, chips: [5, 10, 15, 20, 30, 45], def: 15, max: 600, hint: 'Tocca e segna i minuti' },
+  walk:    { label: 'Camminata',    emoji: '🚶', field: 'minuti', unit: 'minuti', step: 5, chips: [15, 20, 30, 45, 60, 90], def: 30, max: 600, hint: 'Tocca e segna i minuti' },
 };
-const ORDER = ['swim', 'volley', 'stretch'];
+const ORDER = ['swim', 'volley', 'stretch', 'walk'];
 const PEOPLE = ['a', 'b'];
 
 const WD_SHORT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
@@ -17,23 +19,40 @@ const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'l
 const CHEERS = {
   swim: (v) => [`${v} vasche, che nuotata! 🌊`, `Splash! ${v} vasche in cassaforte 💧`, `${v} vasche: sei un pesce 🐟`],
   volley: () => ['Schiacciata! 🏐', 'Sabbia, sole e sudore ☀️', 'Punto, set, partita! 🏆'],
-  stretch: () => ['Corpo sciolto, mente leggera 🌿', 'Ogni centimetro conta 🧘', 'Respira… fatto ✨'],
+  stretch: (n) => [`${fmtMin(n)} di allungamenti 🌿`, `Corpo sciolto, mente leggera · ${fmtMin(n)} 🧘`, `${fmtMin(n)} zen ✨`],
+  walk: (n) => [`${fmtMin(n)} a passo svelto 🚶`, `Un passo dopo l’altro: ${fmtMin(n)} 👟`, `${fmtMin(n)} all’aria aperta 🌳`],
 };
 
+// metric = a key of summary(); unlocked when summary()[metric] >= target.
+const B = (id, group, emoji, title, desc, metric, target) => ({ id, group, emoji, title, desc, metric, target });
 const BADGES = [
-  { id: 'first',      emoji: '🌱', title: 'Primo passo',      desc: 'La prima attività',            test: (s) => s.total >= 1 },
-  { id: 'together',   emoji: '💞', title: 'Insieme',          desc: 'Entrambi attivi in un giorno',  test: (s) => s.togetherDays >= 1 },
-  { id: 'tris',       emoji: '🎯', title: 'Tris',             desc: 'Tutte e 3 in un giorno',        test: (s) => s.trisDays >= 1 },
-  { id: 'streak3',    emoji: '🔥', title: 'Tre di fila',      desc: '3 giorni consecutivi',          test: (s) => s.best >= 3 },
-  { id: 'streak7',    emoji: '⚡', title: 'Settimana piena',  desc: '7 giorni consecutivi',          test: (s) => s.best >= 7 },
-  { id: 'streak30',   emoji: '👑', title: 'Inarrestabili',    desc: '30 giorni consecutivi',         test: (s) => s.best >= 30 },
-  { id: 'v100',       emoji: '🐟', title: 'Pesciolino',       desc: '100 vasche in totale',          test: (s) => s.vasche >= 100 },
-  { id: 'v500',       emoji: '🐬', title: 'Delfino',          desc: '500 vasche in totale',          test: (s) => s.vasche >= 500 },
-  { id: 'v1000',      emoji: '🦈', title: 'Squalo',           desc: '1.000 vasche in totale',        test: (s) => s.vasche >= 1000 },
-  { id: 'volley10',   emoji: '🏖️', title: 'Re della spiaggia', desc: '10 partite di beach volley',   test: (s) => s.volley >= 10 },
-  { id: 'stretch10',  emoji: '🌿', title: 'Flessibili',       desc: '10 sessioni di stretching',     test: (s) => s.stretch >= 10 },
-  { id: 'team10',     emoji: '🤝', title: 'Squadra',          desc: '10 giorni attivi insieme',      test: (s) => s.togetherDays >= 10 },
+  B('first',     'insieme', '🌱', 'Primo passo',        'La prima attività',               'total',        1),
+  B('together',  'insieme', '💞', 'Insieme',            'Entrambi attivi in un giorno',    'togetherDays', 1),
+  B('team10',    'insieme', '🤝', 'Squadra',            '10 giorni attivi insieme',        'togetherDays', 10),
+  B('team30',    'insieme', '💑', 'Coppia d’acciaio',   '30 giorni attivi insieme',        'togetherDays', 30),
+  B('tris',      'insieme', '🎯', 'Tris',               '3 attività diverse in un giorno', 'trisDays',     1),
+  B('poker',     'insieme', '🃏', 'Poker',              'Tutte e 4 in un giorno',          'pokerDays',    1),
+  B('streak3',   'serie',   '🔥', 'Tre di fila',        '3 giorni consecutivi',            'best',         3),
+  B('streak7',   'serie',   '⚡', 'Settimana piena',    '7 giorni consecutivi',            'best',         7),
+  B('streak14',  'serie',   '🌟', 'Due settimane',      '14 giorni consecutivi',           'best',         14),
+  B('streak30',  'serie',   '👑', 'Inarrestabili',      '30 giorni consecutivi',           'best',         30),
+  B('streak100', 'serie',   '💎', 'Leggendari',         '100 giorni consecutivi',          'best',         100),
+  B('v100',      'swim',    '🐟', 'Pesciolino',         '100 vasche',                      'vasche',       100),
+  B('v500',      'swim',    '🐬', 'Delfino',            '500 vasche',                      'vasche',       500),
+  B('v1000',     'swim',    '🦈', 'Squalo',             '1.000 vasche',                    'vasche',       1000),
+  B('v5000',     'swim',    '🐋', 'Balena',             '5.000 vasche',                    'vasche',       5000),
+  B('stretch10', 'stretch', '🌿', 'Flessibili',         '10 sessioni di stretching',       'stretch',      10),
+  B('smin60',    'stretch', '🧘', 'Ora zen',            '1 ora di stretching',             'stretchMin',   60),
+  B('smin300',   'stretch', '🪷', 'Fiore di loto',      '5 ore di stretching',             'stretchMin',   300),
+  B('smin1000',  'stretch', '🤸', 'Elastici',           '1.000 minuti di stretching',      'stretchMin',   1000),
+  B('walk1',     'walk',    '👟', 'Si parte',           'La prima camminata',              'walk',         1),
+  B('wmin300',   'walk',    '🥾', 'Esploratori',        '5 ore di camminata',              'walkMin',      300),
+  B('wmin1200',  'walk',    '🗺️', 'Giramondo',          '20 ore di camminata',             'walkMin',      1200),
+  B('wmin3000',  'walk',    '🏔️', 'Pellegrini',         '50 ore di camminata',             'walkMin',      3000),
+  B('volley10',  'volley',  '🏖️', 'Re della spiaggia',  '10 partite di beach volley',      'volley',       10),
+  B('volley50',  'volley',  '🏆', 'Campioni',           '50 partite di beach volley',      'volley',       50),
 ];
+const GROUPS = [['insieme', 'Insieme'], ['serie', 'Serie'], ['swim', 'Nuoto'], ['stretch', 'Stretching'], ['walk', 'Camminata'], ['volley', 'Beach volley']];
 
 /* ================= State ================= */
 
@@ -47,6 +66,7 @@ const state = {
   person: null,
   tab: 'oggi',
   calMonth: todayKey().slice(0, 7),
+  range: 'month', // Progressi stats: 'month' (calendar month) | 'all'
 };
 
 function loadSettings() {
@@ -80,22 +100,40 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const name = (p) => state.settings.names[p];
 const initial = (p) => esc((name(p) || '?').trim().charAt(0).toUpperCase());
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const clamp = (n) => Math.max(0, Math.min(999, n));
+const clamp = (n, max = 999) => Math.max(0, Math.min(max, n));
 const pool = () => state.settings.pool || 25;
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function fmtDist(m) {
   if (m < 1000) return `${m} m`;
   return `${(m / 1000).toLocaleString('it-IT', { maximumFractionDigits: 2 })} km`;
 }
+function fmtMin(n) {
+  if (n < 60) return `${n} min`;
+  const h = Math.floor(n / 60), r = n % 60;
+  return r ? `${h} h ${r} min` : `${h} h`;
+}
+
+// The logged amount of an entry (vasche or minuti), or null for one-tap activities / old entries.
+const amountOf = (e) => (ACTS[e.activity].field ? e[ACTS[e.activity].field] ?? null : null);
+// Long form for cards: "40 vasche · 1 km", "1 h 15 min"
+function amountLong(act, n) {
+  if (act === 'swim') return `${n} vasche · ${fmtDist(n * pool())}`;
+  return fmtMin(n);
+}
+// Short form for pills: "40", "15′"
+const amountShort = (act, n) => (act === 'swim' ? `${n}` : `${n}′`);
+// Totals: "210 vasche", "2 h 30 min"
+const amountTotal = (act, n) => (act === 'swim' ? `${n} vasche` : fmtMin(n));
 
 const entryId = (date, person, act) => `${date}_${person}_${act}`;
 const findEntry = (date, person, act) => state.entries.find((e) => e.id === entryId(date, person, act));
 const entriesOn = (date) => state.entries.filter((e) => e.date === date);
 const actsOn = (date, person) => ORDER.filter((a) => entriesOn(date).some((e) => e.activity === a && (!person || e.person === person)));
 
-function lastVasche(person) {
-  const swims = state.entries.filter((e) => e.activity === 'swim' && e.person === person).sort((a, b) => b.date.localeCompare(a.date));
-  return swims[0]?.vasche;
+function lastAmount(person, act) {
+  const list = state.entries.filter((e) => e.activity === act && e.person === person && amountOf(e)).sort((a, b) => b.date.localeCompare(a.date));
+  return list[0] ? amountOf(list[0]) : null;
 }
 
 function streaks(person) {
@@ -114,23 +152,39 @@ function streaks(person) {
 }
 
 function summary() {
-  const s = { total: state.entries.length, vasche: 0, swim: 0, volley: 0, stretch: 0, togetherDays: 0, trisDays: 0 };
+  const s = { total: state.entries.length, vasche: 0, stretchMin: 0, walkMin: 0, swim: 0, volley: 0, stretch: 0, walk: 0, togetherDays: 0, trisDays: 0, pokerDays: 0 };
   const byDay = {};
   for (const e of state.entries) {
     s[e.activity]++;
     if (e.activity === 'swim') s.vasche += e.vasche || 0;
+    if (e.activity === 'stretch') s.stretchMin += e.minuti || 0;
+    if (e.activity === 'walk') s.walkMin += e.minuti || 0;
     const d = (byDay[e.date] ||= { people: new Set(), acts: new Set() });
     d.people.add(e.person);
     d.acts.add(e.activity);
   }
   for (const d of Object.values(byDay)) {
     if (d.people.size === 2) s.togetherDays++;
-    if (d.acts.size === 3) s.trisDays++;
+    if (d.acts.size >= 3) s.trisDays++;
+    if (d.acts.size === ORDER.length) s.pokerDays++;
   }
   s.best = streaks().best;
   return s;
 }
-const unlockedIds = () => { const s = summary(); return new Set(BADGES.filter((b) => b.test(s)).map((b) => b.id)); };
+const unlockedIds = () => { const s = summary(); return new Set(BADGES.filter((b) => s[b.metric] >= b.target).map((b) => b.id)); };
+
+// "310/500", "3/5 h", "45/60 min", "4/7 giorni"
+const thousands = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+function badgeProgress(b, s) {
+  const cur = Math.min(s[b.metric], b.target);
+  if (b.metric.endsWith('Min')) {
+    return b.target >= 120 && b.target % 60 === 0
+      ? `${Math.floor(cur / 60)}/${b.target / 60} h`
+      : `${thousands(cur)}/${thousands(b.target)} min`;
+  }
+  if (b.metric === 'best') return `${cur}/${b.target} giorni`;
+  return `${thousands(cur)}/${thousands(b.target)}`;
+}
 
 /* ================= Icons ================= */
 
@@ -139,7 +193,10 @@ const ICON = {
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="4"/><path d="M8 2.5v4M16 2.5v4M3.5 9.5h17"/><path d="M8.5 14.5l2.2 2.2 4.8-4.7"/></svg>',
   chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M8.6 13.8L7 22l5-3 5 3-1.6-8.2"/><path d="M12 6.5l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 8.6l2-.3z" fill="currentColor" stroke-width="1"/></svg>',
 };
+
+const TABS = [['oggi', 'Oggi', 'today'], ['progressi', 'Progressi', 'chart'], ['traguardi', 'Traguardi', 'medal']];
 
 /* ================= Render ================= */
 
@@ -159,14 +216,14 @@ function render() {
     $app.innerHTML = `
       <main class="screen" id="screen"></main>
       <nav class="nav"><div class="nav-inner">
-        <button data-action="tab" data-tab="oggi">${ICON.today}Oggi</button>
-        <button data-action="tab" data-tab="progressi">${ICON.chart}Progressi</button>
+        ${TABS.map(([id, label, icon]) => `<button data-action="tab" data-tab="${id}">${ICON[icon]}<span>${label}</span></button>`).join('')}
       </div></nav>`;
     screen = document.getElementById('screen');
   }
   const enter = screen.dataset.tab !== state.tab;
   screen.dataset.tab = state.tab;
-  screen.innerHTML = `<div class="view${enter ? ' enter' : ''}">${state.tab === 'oggi' ? viewToday() : viewProgress()}</div>`;
+  const view = { oggi: viewToday, progressi: viewProgress, traguardi: viewBadges }[state.tab];
+  screen.innerHTML = `<div class="view${enter ? ' enter' : ''}">${view()}</div>`;
   if (enter) screen.scrollTop = 0;
   $app.querySelectorAll('.nav [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
 }
@@ -177,6 +234,13 @@ function greeting() {
   if (h < 13) return 'Buongiorno';
   if (h < 18) return 'Buon pomeriggio';
   return 'Buonasera';
+}
+
+function header(eyebrow, title) {
+  return `<header class="top">
+    <div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1></div>
+    <button class="icon-btn" data-action="settings" aria-label="Impostazioni">${ICON.gear}</button>
+  </header>`;
 }
 
 function streakBanner() {
@@ -216,9 +280,9 @@ function viewToday() {
 
   const actsHtml = ORDER.map((a) => {
     const e = findEntry(sel, person, a);
-    let sub = 'Tocca per registrare';
-    if (e) sub = a === 'swim' ? `${e.vasche} vasche · ${fmtDist(e.vasche * pool())}` : 'Fatto!';
-    else if (a === 'swim') sub = 'Tocca e conta le vasche';
+    const n = e && amountOf(e);
+    let sub = ACTS[a].hint || 'Tocca per registrare';
+    if (e) sub = n ? amountLong(a, n) : 'Fatto!';
     return `<button class="act ${a} ${e ? 'done' : ''}" data-action="act" data-act="${a}" id="act-${a}">
       <span class="emo">${ACTS[a].emoji}</span>
       <span class="txt"><h3>${ACTS[a].label}</h3><p>${sub}</p></span>
@@ -229,7 +293,10 @@ function viewToday() {
   const isPast = sel < state.today;
   const rows = PEOPLE.map((p) => {
     const list = ORDER.map((a) => findEntry(sel, p, a)).filter(Boolean);
-    const pills = list.map((e) => `<span class="pill ${e.activity}">${ACTS[e.activity].emoji}${e.activity === 'swim' ? ` ${e.vasche}` : ''}</span>`).join('');
+    const pills = list.map((e) => {
+      const n = amountOf(e);
+      return `<span class="pill ${e.activity}">${ACTS[e.activity].emoji}${n ? ` ${amountShort(e.activity, n)}` : ''}</span>`;
+    }).join('');
     return `<div class="row">
       <span class="avatar ${p}">${initial(p)}</span>
       <span class="who">${esc(name(p))}</span>
@@ -239,10 +306,7 @@ function viewToday() {
   const both = PEOPLE.every((p) => actsOn(sel, p).length);
 
   return `
-    <header class="top">
-      <div><p class="eyebrow">${greeting()}</p><h1>Ciao, ${esc(name(me))}</h1></div>
-      <button class="icon-btn" data-action="settings" aria-label="Impostazioni">${ICON.gear}</button>
-    </header>
+    ${header(greeting(), `Ciao, ${esc(name(me))}`)}
     ${streakBanner()}
     <section class="week">${weekHtml}</section>
     <div class="day-head">
@@ -270,9 +334,7 @@ function viewProgress() {
   const first = new Date(y, m - 1, 1);
   const daysIn = new Date(y, m, 0).getDate();
   const offset = (first.getDay() + 6) % 7; // Monday first
-  const inMonth = state.entries.filter((e) => e.date.startsWith(month));
   const thisMonth = state.today.slice(0, 7);
-  const activeDays = new Set(state.entries.filter((e) => e.date.startsWith(thisMonth)).map((e) => e.date)).size;
 
   let cells = ['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((w) => `<span class="wd">${w}</span>`).join('');
   cells += '<span></span>'.repeat(offset);
@@ -286,36 +348,33 @@ function viewProgress() {
       : `<button class="cal-day ${acts.length ? 'active' : ''} ${k === state.today ? 'today' : ''}" data-action="cal-day" data-date="${k}" aria-label="${longDate(k)}">${d}<span class="dots">${dots}</span></button>`;
   }
 
+  // Stats for the calendar's month, or since the beginning.
+  const all = state.range === 'all';
+  const scope = all ? state.entries : state.entries.filter((e) => e.date.startsWith(month));
   const pstats = PEOPLE.map((p) => {
-    const mine = inMonth.filter((e) => e.person === p);
+    const mine = scope.filter((e) => e.person === p);
     const days = new Set(mine.map((e) => e.date)).size;
-    const ps = streaks(p);
     const pills = ORDER.map((a) => {
       const list = mine.filter((e) => e.activity === a);
       if (!list.length) return '';
-      const extra = a === 'swim' ? ` · ${list.reduce((t, e) => t + (e.vasche || 0), 0)} vasche` : '';
-      return `<span class="pill ${a}">${ACTS[a].emoji} ${list.length}×${extra}</span>`;
+      const tot = list.reduce((t, e) => t + (amountOf(e) || 0), 0);
+      return `<span class="pill ${a}">${ACTS[a].emoji} ${list.length}×${tot ? ` · ${amountTotal(a, tot)}` : ''}</span>`;
     }).join('');
     return `<div class="pstat">
       <div class="pstat-head"><span class="avatar ${p}">${initial(p)}</span>${esc(name(p))}
-        <small>${days} ${days === 1 ? 'giorno' : 'giorni'} · 🔥 ${ps.cur}</small></div>
-      <div class="pills">${pills || '<span class="pill mute">Nessuna attività questo mese</span>'}</div>
+        <small>${days} ${days === 1 ? 'giorno attivo' : 'giorni attivi'} · 🔥 ${streaks(p).cur}</small></div>
+      <div class="pills">${pills || `<span class="pill mute">Nessuna attività ${all ? 'ancora' : 'in questo mese'}</span>`}</div>
     </div>`;
   }).join('');
-
-  const got = unlockedIds();
-  const badges = BADGES.map((b) => `<div class="badge ${got.has(b.id) ? '' : 'locked'}">
-    <span class="b-emo">${b.emoji}</span><strong>${b.title}</strong><small>${b.desc}</small>
-  </div>`).join('');
+  const sharedDays = new Set(scope.map((e) => e.date)).size;
 
   return `
-    <header class="top"><div><p class="eyebrow">Insieme</p><h1>Progressi</h1></div>
-      <button class="icon-btn" data-action="settings" aria-label="Impostazioni">${ICON.gear}</button></header>
+    ${header('Insieme', 'Progressi')}
     <section class="stats">
       <div class="card stat"><span class="emo">🔥</span><strong>${st.cur}</strong><span>serie attuale</span></div>
       <div class="card stat"><span class="emo">🏆</span><strong>${st.best}</strong><span>record di giorni</span></div>
       <div class="card stat"><span class="emo">🌊</span><strong>${s.vasche}</strong><span>vasche · ${fmtDist(s.vasche * pool())}</span></div>
-      <div class="card stat"><span class="emo">📅</span><strong>${activeDays}</strong><span>attivi questo mese</span></div>
+      <div class="card stat"><span class="emo">⏱️</span><strong>${fmtMin(s.stretchMin + s.walkMin)}</strong><span>di stretching e camminata</span></div>
     </section>
     <section class="card">
       <div class="cal-head">
@@ -327,13 +386,57 @@ function viewProgress() {
       <div class="legend">${ORDER.map((a) => `<span><i class="dot ${a}"></i>${ACTS[a].label}</span>`).join('')}</div>
     </section>
     <section class="card">
-      <div class="section-title"><h3>Questo mese</h3><small>${MONTHS[m - 1]}</small></div>
+      <div class="section-title">
+        <h3>Statistiche</h3>
+        <div class="seg mini" role="tablist" aria-label="Periodo">
+          <button class="${all ? '' : 'on'}" data-action="range" data-range="month" role="tab" aria-selected="${!all}">${cap(MONTHS[m - 1])}</button>
+          <button class="${all ? 'on' : ''}" data-action="range" data-range="all" role="tab" aria-selected="${all}">Da sempre</button>
+        </div>
+      </div>
+      <p class="range-note">${sharedDays} ${sharedDays === 1 ? 'giorno' : 'giorni'} in movimento ${all ? 'da quando avete iniziato' : `a ${MONTHS[m - 1]}`}</p>
       <div class="pstats">${pstats}</div>
-    </section>
-    <section class="card">
-      <div class="section-title"><h3>Traguardi</h3><small>${got.size}/${BADGES.length}</small></div>
-      <div class="badges">${badges}</div>
     </section>`;
+}
+
+function viewBadges() {
+  const s = summary();
+  const got = unlockedIds();
+  const pct = Math.round((got.size / BADGES.length) * 100);
+
+  // The locked badge you're closest to.
+  const next = BADGES.filter((b) => !got.has(b.id))
+    .map((b) => ({ b, r: s[b.metric] / b.target }))
+    .sort((x, y) => y.r - x.r)[0];
+
+  const card = (b) => {
+    const on = got.has(b.id);
+    const r = Math.min(1, s[b.metric] / b.target);
+    return `<div class="badge ${on ? '' : 'locked'}">
+      <span class="b-emo">${b.emoji}</span><strong>${b.title}</strong><small>${b.desc}</small>
+      ${on ? '' : `<span class="bar"><i style="width:${Math.round(r * 100)}%"></i></span><small class="prog">${badgeProgress(b, s)}</small>`}
+    </div>`;
+  };
+
+  const groups = GROUPS.map(([g, label]) => {
+    const list = BADGES.filter((b) => b.group === g);
+    const n = list.filter((b) => got.has(b.id)).length;
+    return `<section class="card">
+      <div class="section-title"><h3>${label}</h3><small>${n}/${list.length}</small></div>
+      <div class="badges">${list.map(card).join('')}</div>
+    </section>`;
+  }).join('');
+
+  return `
+    ${header('Insieme', 'Traguardi')}
+    <section class="card trophy">
+      <div class="trophy-top">
+        <div><strong>${got.size}<span>/${BADGES.length}</span></strong><p>traguardi sbloccati</p></div>
+        <div class="trophy-emo">🏅</div>
+      </div>
+      <span class="bar big"><i style="width:${pct}%"></i></span>
+      ${next ? `<p class="next">Prossimo: <b>${next.b.emoji} ${next.b.title}</b> · ${badgeProgress(next.b, s)}</p>` : '<p class="next">Li avete sbloccati tutti! 👑</p>'}
+    </section>
+    ${groups}`;
 }
 
 /* ================= Onboarding ================= */
@@ -469,7 +572,8 @@ function renderOnboarding(step, data = {}) {
 const DID = {
   swim: (e) => `ha nuotato ${e.vasche} vasche 🏊`,
   volley: () => 'ha giocato a beach volley 🏐',
-  stretch: () => 'ha fatto stretching 🧘',
+  stretch: (e) => `ha fatto ${e.minuti ? `${fmtMin(e.minuti)} di ` : ''}stretching 🧘`,
+  walk: (e) => `ha camminato${e.minuti ? ` ${fmtMin(e.minuti)}` : ''} 🚶`,
 };
 
 async function runSync({ quiet = false } = {}) {
@@ -549,6 +653,7 @@ document.addEventListener('click', (ev) => {
     case 'day': state.date = el.dataset.date; render(); break;
     case 'today': state.date = state.today; render(); break;
     case 'person': state.person = el.dataset.person; render(); break;
+    case 'range': state.range = el.dataset.range; render(); break;
     case 'act': onActivity(el.dataset.act); break;
     case 'settings': openSettings(); break;
     case 'cal-prev': state.calMonth = shiftMonth(state.calMonth, -1); render(); break;
@@ -569,7 +674,7 @@ function shiftMonth(month, n) {
 
 function onActivity(act) {
   const existing = findEntry(state.date, state.person, act);
-  if (act === 'swim') return openSwim(existing);
+  if (ACTS[act].field) return openAmount(act, existing);
   if (existing) return openRemove(act);
   logActivity(act);
 }
@@ -579,7 +684,7 @@ async function refresh() {
   render();
 }
 
-async function logActivity(act, vasche = null) {
+async function logActivity(act, amount = null) {
   const before = unlockedIds();
   const streakBefore = streaks().cur;
   const entry = {
@@ -587,7 +692,8 @@ async function logActivity(act, vasche = null) {
     date: state.date,
     person: state.person,
     activity: act,
-    vasche: act === 'swim' ? vasche : null,
+    vasche: ACTS[act].field === 'vasche' ? amount : null,
+    minuti: ACTS[act].field === 'minuti' ? amount : null,
     updatedAt: new Date().toISOString(),
   };
   await store.upsert(entry);
@@ -599,7 +705,7 @@ async function logActivity(act, vasche = null) {
 
   const st = streaks();
   const sub = st.cur > streakBefore && st.cur > 1 ? `🔥 ${st.cur} giorni di fila` : `${name(state.person)} · ${dayLabel(state.date)}`;
-  toast(pick(CHEERS[act](vasche)), sub);
+  toast(pick(CHEERS[act](amount)), sub);
 
   const fresh = BADGES.filter((b) => !before.has(b.id) && unlockedIds().has(b.id));
   if (fresh.length) setTimeout(() => showUnlock(fresh), 1100);
@@ -641,44 +747,50 @@ function sheetHead(act) {
     <div><h3>${ACTS[act].label}</h3><p>${esc(name(state.person))} · ${dayLabel(state.date)}</p></div></div>`;
 }
 
-function openSwim(existing) {
-  const start = existing?.vasche ?? lastVasche(state.person) ?? 20;
+// Counter sheet for activities with an amount (vasche for swimming, minuti for stretching/camminata).
+function openAmount(act, existing) {
+  const cfg = ACTS[act];
+  const start = (existing && amountOf(existing)) ?? lastAmount(state.person, act) ?? cfg.def;
+  const less = cfg.unit === 'vasche' ? 'Una vasca in meno' : `${cfg.step} minuti in meno`;
+  const more = cfg.unit === 'vasche' ? 'Una vasca in più' : `${cfg.step} minuti in più`;
   openSheet(`
-    ${sheetHead('swim')}
-    <div class="counter">
-      <button class="round" data-step="-1" aria-label="Una vasca in meno">−</button>
-      <div class="count"><input id="vasche" type="number" inputmode="numeric" min="1" max="999" value="${start}" aria-label="Vasche"><span>vasche</span></div>
-      <button class="round" data-step="1" aria-label="Una vasca in più">+</button>
+    ${sheetHead(act)}
+    <div class="counter ${act}">
+      <button class="round" data-step="-${cfg.step}" aria-label="${less}">−</button>
+      <div class="count"><input id="amount" type="number" inputmode="numeric" min="1" max="${cfg.max}" value="${start}" aria-label="${cfg.unit}"><span>${cfg.unit}</span></div>
+      <button class="round" data-step="${cfg.step}" aria-label="${more}">+</button>
     </div>
-    <p class="meters" id="meters"></p>
-    <div class="chips">${[10, 20, 30, 40, 50, 60].map((n) => `<button class="chip" data-set="${n}">${n}</button>`).join('')}</div>
+    <p class="meters ${act}" id="detail"></p>
+    <div class="chips ${act}">${cfg.chips.map((n) => `<button class="chip" data-set="${n}">${n}</button>`).join('')}</div>
     <div class="sheet-actions">
       ${existing ? '<button class="btn danger small" data-remove>Rimuovi</button>' : ''}
-      <button class="btn primary swim" data-save>${existing ? 'Aggiorna' : 'Registra'}</button>
+      <button class="btn primary ${act}" data-save>${existing ? 'Aggiorna' : 'Registra'}</button>
     </div>`, (sheet) => {
-    const input = sheet.querySelector('#vasche');
-    const meters = sheet.querySelector('#meters');
-    const sync = () => {
-      const n = clamp(parseInt(input.value, 10) || 0);
-      meters.textContent = n ? `≈ ${fmtDist(n * pool())} in vasca da ${pool()} m` : '';
+    const input = sheet.querySelector('#amount');
+    const detail = sheet.querySelector('#detail');
+    const val = () => clamp(parseInt(input.value, 10) || 0, cfg.max);
+    const update = () => {
+      const n = val();
+      if (act === 'swim') detail.textContent = n ? `≈ ${fmtDist(n * pool())} in vasca da ${pool()} m` : '';
+      else detail.textContent = n >= 60 ? fmtMin(n) : '';
       sheet.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', Number(c.dataset.set) === n));
     };
     sheet.addEventListener('click', (e) => {
       const step = e.target.closest('[data-step]');
       const set = e.target.closest('[data-set]');
-      if (step) { input.value = clamp((parseInt(input.value, 10) || 0) + Number(step.dataset.step)); sync(); }
-      if (set) { input.value = set.dataset.set; sync(); }
+      if (step) { input.value = clamp(val() + Number(step.dataset.step), cfg.max); update(); }
+      if (set) { input.value = set.dataset.set; update(); }
       if (e.target.closest('[data-save]')) {
-        const n = clamp(parseInt(input.value, 10) || 0);
+        const n = val();
         if (n < 1) { input.focus(); return; }
         closeSheet();
-        logActivity('swim', n);
+        logActivity(act, n);
       }
-      if (e.target.closest('[data-remove]')) { closeSheet(); removeActivity('swim'); }
+      if (e.target.closest('[data-remove]')) { closeSheet(); removeActivity(act); }
     });
-    input.addEventListener('input', sync);
+    input.addEventListener('input', update);
     input.addEventListener('focus', () => input.select());
-    sync();
+    update();
   });
 }
 
@@ -800,7 +912,7 @@ function toast(title, sub = '') {
 function palette(act) {
   const css = getComputedStyle(document.documentElement);
   const v = (n) => css.getPropertyValue(n).trim();
-  const all = [v('--swim'), v('--volley'), v('--stretch'), v('--flame'), '#FFD166'];
+  const all = [v('--swim'), v('--volley'), v('--stretch'), v('--walk'), v('--flame'), '#FFD166'];
   return act ? [v(`--${act}`), v(`--${act}`), '#FFD166', v('--flame')] : all;
 }
 

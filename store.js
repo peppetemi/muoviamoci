@@ -57,8 +57,8 @@ async function api(path, { method = 'GET', body, prefer, spaceOverride } = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-const toRow = (e) => ({ space, id: e.id, date: e.date, person: e.person, activity: e.activity, vasche: e.vasche ?? null, updated_at: e.updatedAt });
-const fromRow = (r) => ({ id: r.id, date: r.date, person: r.person, activity: r.activity, vasche: r.vasche, updatedAt: r.updated_at });
+const toRow = (e) => ({ space, id: e.id, date: e.date, person: e.person, activity: e.activity, vasche: e.vasche ?? null, minuti: e.minuti ?? null, updated_at: e.updatedAt });
+const fromRow = (r) => ({ id: r.id, date: r.date, person: r.person, activity: r.activity, vasche: r.vasche, minuti: r.minuti, updatedAt: r.updated_at });
 const q = (v) => encodeURIComponent(v);
 
 /* ---------- spaces (the couple's shared code) ---------- */
@@ -148,7 +148,7 @@ async function flush() {
 
 async function pull() {
   const [rows, sp] = await Promise.all([
-    api(`entries?space=eq.${q(space)}&select=id,date,person,activity,vasche,updated_at&order=date.asc`),
+    api(`entries?space=eq.${q(space)}&select=id,date,person,activity,vasche,minuti,updated_at&order=date.asc`),
     fetchSpace(),
   ]);
   // Server is the truth, plus any local changes that haven't been pushed yet.
